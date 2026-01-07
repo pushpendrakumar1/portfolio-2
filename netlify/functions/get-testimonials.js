@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { neon } = require('@netlify/neon');
 
 exports.handler = async (event, context) => {
   // CORS headers
@@ -18,35 +18,17 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Get database connection string from environment variables
-    // Try NETLIFY_DATABASE_URL first (Neon), then DATABASE_URL as fallback
-    const connectionString = process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL;
-    
-    if (!connectionString) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Database connection string not configured',
-          details: 'Please set NETLIFY_DATABASE_URL or DATABASE_URL environment variable in Netlify'
-        }),
-      };
-    }
+    // Initialize Neon client - automatically uses NETLIFY_DATABASE_URL
+    const sql = neon();
 
-    // Create connection pool
-    const pool = new Pool({
-      connectionString: connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
-
-    // Query testimonials
-    const result = await pool.query(
-      'SELECT id, name, position, company, message, rating, created_at FROM testimonials WHERE approved = true ORDER BY created_at DESC LIMIT 10'
-    );
-
-    await pool.end();
+    // Query testimonials using template literal syntax
+    const result = await sql`
+      SELECT id, name, position, company, message, rating, created_at 
+      FROM testimonials 
+      WHERE approved = true 
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `;
 
     return {
       statusCode: 200,
@@ -54,7 +36,7 @@ exports.handler = async (event, context) => {
         ...headers,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(result.rows),
+      body: JSON.stringify(result),
     };
   } catch (error) {
     console.error('Error fetching testimonials:', error);
