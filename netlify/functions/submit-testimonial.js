@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { neon } = require('@netlify/neon');
 
 exports.handler = async (event, context) => {
   // CORS headers
@@ -40,38 +40,15 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Get database connection string from environment variables
-    // Try NETLIFY_DATABASE_URL first (Neon), then DATABASE_URL as fallback
-    const connectionString = process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL;
-    
-    if (!connectionString) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Database connection string not configured',
-          details: 'Please set NETLIFY_DATABASE_URL or DATABASE_URL environment variable in Netlify'
-        }),
-      };
-    }
+    // Initialize Neon client - automatically uses NETLIFY_DATABASE_URL
+    const sql = neon();
 
-    // Create connection pool
-    const pool = new Pool({
-      connectionString: connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
-
-    // Insert testimonial (initially not approved)
-    const result = await pool.query(
-      `INSERT INTO testimonials (name, position, company, message, rating, approved, created_at) 
-       VALUES ($1, $2, $3, $4, $5, false, NOW()) 
-       RETURNING id, name, position, company, message, rating, created_at`,
-      [name, position || null, company || null, message, parseInt(rating) || 5]
-    );
-
-    await pool.end();
+    // Insert testimonial (initially not approved) using template literal syntax
+    const result = await sql`
+      INSERT INTO testimonials (name, position, company, message, rating, approved, created_at) 
+      VALUES (${name}, ${position || null}, ${company || null}, ${message}, ${parseInt(rating) || 5}, false, NOW()) 
+      RETURNING id, name, position, company, message, rating, created_at
+    `;
 
     return {
       statusCode: 201,
@@ -82,7 +59,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ 
         success: true, 
         message: 'Testimonial submitted successfully! It will be reviewed before being published.',
-        testimonial: result.rows[0]
+        testimonial: result[0]
       }),
     };
   } catch (error) {
