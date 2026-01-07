@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Google Apps Script URL</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid #444;
+        }
+        h1 {
+            color: #ff004f;
+        }
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 14px;
+        }
+        button {
+            background: #ff004f;
+            color: #fff;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #c2003d;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #1a5a1a;
+            border: 1px solid #4caf50;
+            display: block;
+        }
+        .error {
+            background: #5a1a1a;
+            border: 1px solid #f44336;
+            display: block;
+        }
+        .info {
+            background: #1a3a5a;
+            border: 1px solid #2196f3;
+            display: block;
+        }
+        code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Google Apps Script URL</h1>
+        <p>Use this tool to test if your Google Apps Script is deployed correctly.</p>
+        
+        <label for="scriptUrl">Your Script URL:</label>
+        <input 
+            type="text" 
+            id="scriptUrl" 
+            placeholder="https://script.google.com/macros/s/.../exec"
+            value="https://script.google.com/macros/s/AKfycbz8vnGF_O-Dfm7-V_ehLfqa48dUb62GXZCYOWUQ5JjQDzZbSXKcJFcs0qIdf7nolcel/exec"
+        >
+        
+        <button onclick="testUrl()">Test URL</button>
+        <button onclick="testWithData()">Test with Sample Data</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function showResult(message, type) {
+            const result = document.getElementById('result');
+            result.className = 'result ' + type;
+            result.innerHTML = message;
+        }
+
+        async function testUrl() {
+            const url = document.getElementById('scriptUrl').value;
+            if (!url) {
+                showResult('Please enter a script URL', 'error');
+                return;
+            }
+
+            showResult('Testing...', 'info');
+
+            try {
+                // Test with a simple GET request first
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+
+                showResult(`
+                    <strong>✅ Request Sent Successfully</strong><br>
+                    <p>Note: With no-cors mode, we can't verify the response, but the request was sent.</p>
+                    <p><strong>Next Steps:</strong></p>
+                    <ol>
+                        <li>Check your Google Sheet to see if data was saved</li>
+                        <li>If you get 403 error, check deployment permissions</li>
+                        <li>Make sure "Who has access" is set to "Anyone"</li>
+                    </ol>
+                `, 'info');
+            } catch (error) {
+                showResult(`
+                    <strong>❌ Error Testing URL</strong><br>
+                    <p>Error: ${error.message}</p>
+                    <p><strong>Common Issues:</strong></p>
+                    <ul>
+                        <li>Script not deployed as Web App</li>
+                        <li>"Who has access" is set to "Only myself" (should be "Anyone")</li>
+                        <li>Script URL is incorrect</li>
+                    </ul>
+                    <p>See <code>QUICK_FIX_403.md</code> for instructions.</p>
+                `, 'error');
+            }
+        }
+
+        async function testWithData() {
+            const url = document.getElementById('scriptUrl').value;
+            if (!url) {
+                showResult('Please enter a script URL', 'error');
+                return;
+            }
+
+            showResult('Sending test data...', 'info');
+
+            const formData = new FormData();
+            formData.append('Name', 'Test User');
+            formData.append('Email', 'test@example.com');
+            formData.append('Phone', '1234567890');
+            formData.append('Message', 'This is a test message from the test tool');
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors'
+                });
+
+                showResult(`
+                    <strong>✅ Test Data Sent</strong><br>
+                    <p><strong>Sent Data:</strong></p>
+                    <ul>
+                        <li>Name: Test User</li>
+                        <li>Email: test@example.com</li>
+                        <li>Phone: 1234567890</li>
+                        <li>Message: This is a test message from the test tool</li>
+                    </ul>
+                    <p><strong>Next Steps:</strong></p>
+                    <ol>
+                        <li>Open your Google Sheet</li>
+                        <li>Check if a new row was added with the test data</li>
+                        <li>If no data appears, check Google Apps Script → Executions tab for errors</li>
+                    </ol>
+                    <p><strong>Your Sheet:</strong><br>
+                    <a href="https://docs.google.com/spreadsheets/d/1bS0kBJrsN8k8EA6HqZKqNoe9gozXoXxtWzmMMQ-Yavs/edit" target="_blank" style="color: #4caf50;">Open Google Sheet</a></p>
+                `, 'success');
+            } catch (error) {
+                showResult(`
+                    <strong>❌ Error Sending Data</strong><br>
+                    <p>Error: ${error.message}</p>
+                    <p><strong>This usually means:</strong></p>
+                    <ul>
+                        <li>Script is not deployed correctly</li>
+                        <li>403 Forbidden = Wrong permissions (set to "Anyone")</li>
+                        <li>Script URL is incorrect</li>
+                    </ul>
+                    <p><strong>Fix:</strong> See <code>QUICK_FIX_403.md</code> for step-by-step instructions.</p>
+                `, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
+
