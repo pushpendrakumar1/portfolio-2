@@ -19,13 +19,17 @@ exports.handler = async (event, context) => {
 
   try {
     // Get database connection string from environment variables
-    const connectionString = process.env.DATABASE_URL;
+    // Try NETLIFY_DATABASE_URL first (Neon), then DATABASE_URL as fallback
+    const connectionString = process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL;
     
     if (!connectionString) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'Database connection string not configured' }),
+        body: JSON.stringify({ 
+          error: 'Database connection string not configured',
+          details: 'Please set NETLIFY_DATABASE_URL or DATABASE_URL environment variable in Netlify'
+        }),
       };
     }
 
