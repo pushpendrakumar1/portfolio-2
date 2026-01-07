@@ -1056,11 +1056,14 @@
             // Fetch testimonials from API
             async function fetchTestimonials() {
                 // Check if running locally (development mode)
-                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                const isLocal = window.location.hostname === 'localhost' || 
+                               window.location.hostname === '127.0.0.1' ||
+                               window.location.hostname === '';
+                
+                const container = document.getElementById('testimonialsContainer');
                 
                 if (isLocal) {
                     // Show message that testimonials work on deployed site
-                    const container = document.getElementById('testimonialsContainer');
                     container.innerHTML = `
                         <div class="testimonial-empty">
                             <i class="fa-solid fa-info-circle"></i>
@@ -1075,7 +1078,39 @@
                     const response = await fetch('/.netlify/functions/get-testimonials');
                     
                     if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                        // Try to get error message from response
+                        let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                        let errorDetails = '';
+                        try {
+                            const errorData = await response.json();
+                            if (errorData.error) {
+                                errorMessage = errorData.error;
+                                if (errorData.details) {
+                                    errorDetails = errorData.details;
+                                }
+                            }
+                        } catch (e) {
+                            // Couldn't parse error, use default message
+                        }
+                        
+                        // Check if it's a 404 (functions not deployed)
+                        if (response.status === 404) {
+                            showTestimonialError('Netlify functions not found. Please check your deployment and ensure functions are in netlify/functions/ folder.');
+                            return;
+                        }
+                        
+                        // Check if it's a 500 (database/config error)
+                        if (response.status === 500) {
+                            let fullError = errorMessage;
+                            if (errorDetails) {
+                                fullError += ' - ' + errorDetails;
+                            }
+                            showTestimonialError('Database error: ' + fullError + '. Check Netlify environment variables (NETLIFY_DATABASE_URL).');
+                            return;
+                        }
+                        
+                        showTestimonialError('Failed to load testimonials: ' + errorMessage);
+                        return;
                     }
                     
                     const data = await response.json();
@@ -1083,11 +1118,17 @@
                     if (Array.isArray(data)) {
                         displayTestimonials(data);
                     } else {
-                        showTestimonialError('Failed to load testimonials');
+                        showTestimonialError('Failed to load testimonials. Invalid response format.');
                     }
                 } catch (error) {
                     console.error('Error fetching testimonials:', error);
-                    showTestimonialError('Unable to load testimonials. Please try again later.');
+                    
+                    // Check if it's a network error (functions not available)
+                    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                        showTestimonialError('Netlify functions are not available. Please check your deployment and ensure functions are deployed correctly.');
+                    } else {
+                        showTestimonialError('Unable to load testimonials: ' + error.message);
+                    }
                 }
             }
             
@@ -1209,10 +1250,12 @@
                     }
                     
                     // Check if running locally
-                    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    const isLocal = window.location.hostname === 'localhost' || 
+                                   window.location.hostname === '127.0.0.1' ||
+                                   window.location.hostname === '';
                     
                     if (isLocal) {
-                        msgDiv.innerHTML = '<i class="fa-solid fa-info-circle"></i> Testimonial submission works on deployed site. Netlify functions only work when deployed.';
+                        msgDiv.innerHTML = '<i class="fa-solid fa-info-circle"></i> Testimonial submission works on deployed site. Netlify functions only work when deployed to Netlify.';
                         msgDiv.style.color = '#ffa500';
                         return;
                     }
@@ -1232,7 +1275,36 @@
                         });
                         
                         if (!response.ok) {
-                            throw new Error('Network response was not ok');
+                            // Try to get error message from response
+                            let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                            let errorDetails = '';
+                            try {
+                                const errorData = await response.json();
+                                if (errorData.error) {
+                                    errorMessage = errorData.error;
+                                    if (errorData.details) {
+                                        errorDetails = errorData.details;
+                                    }
+                                }
+                            } catch (e) {
+                                // Couldn't parse error, use default message
+                            }
+                            
+                            // Check if it's a 404 (functions not deployed)
+                            if (response.status === 404) {
+                                throw new Error('Netlify functions not found. Please check your deployment.');
+                            }
+                            
+                            // Check if it's a 500 (database/config error)
+                            if (response.status === 500) {
+                                let fullError = errorMessage;
+                                if (errorDetails) {
+                                    fullError += ' - ' + errorDetails;
+                                }
+                                throw new Error('Database error: ' + fullError + '. Check Netlify environment variables (NETLIFY_DATABASE_URL).');
+                            }
+                            
+                            throw new Error(errorMessage);
                         }
                         
                         const data = await response.json();
@@ -1254,7 +1326,18 @@
                         }
                     } catch (error) {
                         console.error('Error submitting testimonial:', error);
-                        msgDiv.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Network error. Please check your connection and try again.';
+                        
+                        // Provide helpful error messages
+                        let errorMsg = 'Unable to submit testimonial. ';
+                        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                            errorMsg += 'Netlify functions are not available. Please deploy to Netlify and configure the functions.';
+                        } else if (error.message.includes('404')) {
+                            errorMsg += 'Netlify functions not found. Please deploy the functions to Netlify.';
+                        } else {
+                            errorMsg += 'Please check your connection and try again.';
+                        }
+                        
+                        msgDiv.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> ' + errorMsg;
                         msgDiv.style.color = '#ff004f';
                     } finally {
                         submitBtn.disabled = false;
